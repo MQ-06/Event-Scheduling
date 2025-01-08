@@ -1,15 +1,18 @@
 #include <iostream>
 #include <vector>
 #include <string>
-#include "event.h"
+#include "EventNode.h"
 using namespace std;
 
 class Tree
 {
-    Event *event;
+public:
+    Event *root_event;
     Tree *lchild;
     Tree *rchild;
 
-    public:
-    Tree(Event *e):event(e),lchild(nullptr),rchild(nullptr);
+    Tree(Event *e);
+    Tree();
+    Tree(Event *e, Tree *lchild, Tree *child);
+    ~Tree();
 };
