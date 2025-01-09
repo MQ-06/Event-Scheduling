@@ -16,6 +16,16 @@ public:
 
     void addEvent(Event *event)
     {
+        string date = event->getTimeDate().substr(0, 10);
+        int start = event->getStartTime();
+        int end = event->getEndTime();
+
+        vector<Event *> overlappingEvents = findOverlappingEvents(date, convertToTime(start), convertToTime(end));
+        if (!overlappingEvents.empty())
+        {
+            throw invalid_argument("Cannot add event. Overlapping events are not allowed.");
+        }
+
         root = addEventRec(root, event);
     }
 
@@ -35,7 +45,13 @@ public:
         string newEndTimeStr = convertToTime(newEndTime);
 
         vector<Event *> overlappingEvents = findOverlappingEvents(newDate, newStartTimeStr, newEndTimeStr);
-        if (!overlappingEvents.empty() && overlappingEvents[0]->getEventID() != id)
+
+        overlappingEvents.erase(
+            remove_if(overlappingEvents.begin(), overlappingEvents.end(), [&](Event *event)
+                      { return event->getEventID() == id; }),
+            overlappingEvents.end());
+
+        if (!overlappingEvents.empty())
         {
             throw invalid_argument("Updated event overlaps with existing events.");
         }
@@ -47,7 +63,15 @@ public:
 
     void deleteEvent(int id)
     {
-        root = deleteEventRec(root, id);
+        try
+        {
+            root = deleteEventRec(root, id);
+            cout << "Event with ID " << id << " successfully deleted." << endl;
+        }
+        catch (const invalid_argument &e)
+        {
+            cerr << e.what() << endl;
+        }
     }
 
     vector<Event *> findOverlappingEvents(const string &date, const string &startTime, const string &endTime)
@@ -57,7 +81,21 @@ public:
 
         vector<Event *> overlaps;
         findOverlaps(root, date, start, end, overlaps);
-        return overlaps;
+
+        vector<Event *> actualOverlaps;
+        for (Event *event : overlaps)
+        {
+            int eventStart = event->getStartTime();
+            int eventEnd = event->getEndTime();
+
+            if ((eventStart < end && eventEnd > start) ||
+                (eventStart == end || eventEnd == start))
+            {
+                actualOverlaps.push_back(event);
+            }
+        }
+
+        return actualOverlaps;
     }
 
     vector<pair<string, string>> findFreeTimeSlots(const string &date)
@@ -124,7 +162,9 @@ private:
     Tree *deleteEventRec(Tree *node, int id)
     {
         if (!node)
-            return nullptr;
+        {
+            throw invalid_argument("Event with the given ID does not exist and cannot be deleted.");
+        }
 
         if (node->root_event->getEventID() == id)
         {

@@ -57,10 +57,12 @@ public:
 
     void displayEvent() const
     {
-        cout << "Event ID: " << event_id << endl;
-        cout << "Event Name: " << event_name << endl;
+        cout << "\n==================== Event Details ====================\n";
+        cout << "Event ID        : " << event_id << endl;
+        cout << "Event Name      : " << event_name << endl;
         cout << "Event Date & Time: " << time_date << endl;
-        cout << "Event Duration: " << event_duration << " minutes" << endl;
+        cout << "Event Duration  : " << event_duration << " minutes" << endl;
+        cout << "=======================================================\n";
     }
 
     bool isValidTimeDate(const string &date) const

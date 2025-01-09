@@ -89,7 +89,7 @@ int main()
 
                 scheduler.deleteEvent(eventId);
 
-                cout << "Event deleted successfully.\n";
+                // cout << "Event deleted successfully.\n";
             }
             else if (choice == 4)
             {
