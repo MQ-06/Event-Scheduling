@@ -9,14 +9,13 @@ using namespace std;
 
 class Event
 {
-private:
+public:
     int event_id;
     string event_name;
     string time_date;
     int event_duration;
     static vector<int> unique_id;
 
-public:
     Event(string name, string date, int duration)
         : event_name(name), event_duration(duration)
     {
@@ -63,9 +62,10 @@ public:
         cout << "Event Date & Time: " << time_date << endl;
         cout << "Event Duration: " << event_duration << " minutes" << endl;
     }
+
     bool isValidTimeDate(const string &date) const
     {
-        if (date.length() < 16 || date.length() > 16)
+        if (date.length() != 16)
             return false;
 
         if (date[4] != '-' || date[7] != '-' || date[10] != ' ' || date[13] != ':')
@@ -87,7 +87,7 @@ public:
 
         if (month < 1 || month > 12)
             return false;
-        if (day < 1 || day > 31)
+        if (day < 1 || day > getDaysInMonth(year, month))
             return false;
         if (hour < 0 || hour > 23)
             return false;
@@ -125,7 +125,7 @@ public:
         return unique_id;
     }
 
-    void extract_components(int &year, int &month, int &day, int &hour, int &minute) const
+    void extract_components(const string &time_date, int &year, int &month, int &day, int &hour, int &minute) const
     {
         year = stoi(time_date.substr(0, 4));
         month = stoi(time_date.substr(5, 2));
@@ -134,9 +134,8 @@ public:
         minute = stoi(time_date.substr(14, 2));
     }
 
-    void calculateEndTime(int &year, int &month, int &day, int &hour, int &minute) const
+    void calculateEndTime(int &year, int &month, int &day, int &hour, int &minute, int duration) const
     {
-        int duration = event_duration;
         minute += duration;
 
         while (minute >= 60)
@@ -165,6 +164,21 @@ public:
 
             daysInMonth = getDaysInMonth(year, month);
         }
+    }
+
+    int getStartTime() const
+    {
+        int year, month, day, hour, minute;
+        extract_components(time_date, year, month, day, hour, minute);
+        return hour * 60 + minute;
+    }
+
+    int getEndTime() const
+    {
+        int year, month, day, hour, minute;
+        extract_components(time_date, year, month, day, hour, minute);
+        calculateEndTime(year, month, day, hour, minute, event_duration);
+        return hour * 60 + minute;
     }
 
     int getDaysInMonth(int year, int month) const

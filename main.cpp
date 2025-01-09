@@ -1,8 +1,23 @@
 #include <iostream>
 #include <string>
 #include <vector>
+#include <limits>
 #include "EVENT_SCHEDULING.h"
 using namespace std;
+
+void menu()
+{
+    cout << "\n================ Event Scheduling System ================\n";
+    cout << "1. Add Event\n";
+    cout << "2. Update Event\n";
+    cout << "3. Delete Event\n";
+    cout << "4. Find Overlapping Events\n";
+    cout << "5. Find Free Time Slots\n";
+    cout << "6. Print Full Schedule\n";
+    cout << "7. Exit\n";
+    cout << "========================================================\n";
+    cout << "Enter your choice: ";
+}
 
 int main()
 {
@@ -11,17 +26,14 @@ int main()
 
     do
     {
-        cout << "\n================ Event Scheduling System ================\n";
-        cout << "1. Add Event\n";
-        cout << "2. Update Event\n";
-        cout << "3. Delete Event\n";
-        cout << "4. Find Overlapping Events\n";
-        cout << "5. Find Free Time Slots\n";
-        cout << "6. Print Full Schedule\n";
-        cout << "7. Exit\n";
-        cout << "========================================================\n";
-        cout << "Enter your choice: ";
-        cin >> choice;
+        menu();
+
+        while (!(cin >> choice) || choice < 1 || choice > 7)
+        {
+            cout << "Invalid choice. Please enter a number between 1 and 7: ";
+            cin.clear();
+            cin.ignore(numeric_limits<streamsize>::max(), '\n');
+        }
 
         try
         {
@@ -81,60 +93,72 @@ int main()
             }
             else if (choice == 4)
             {
-                int startHour, startMinute, endHour, endMinute;
+                string date, startTime, endTime;
 
-                cout << "Enter Start Hour (24-hour format): ";
-                cin >> startHour;
+                cout << "Enter Date (YYYY-MM-DD): ";
+                cin >> date;
 
-                cout << "Enter Start Minute: ";
-                cin >> startMinute;
+                cout << "Enter Start Time (HH:MM): ";
+                cin >> startTime;
 
-                cout << "Enter End Hour (24-hour format): ";
-                cin >> endHour;
+                cout << "Enter End Time (HH:MM): ";
+                cin >> endTime;
 
-                cout << "Enter End Minute: ";
-                cin >> endMinute;
-
-                scheduler.getOverlappingEvents(startHour, startMinute, endHour, endMinute);
+                vector<Event *> overlappingEvents = scheduler.findOverlappingEvents(date, startTime, endTime);
+                if (overlappingEvents.empty())
+                {
+                    cout << "No overlapping events found.\n";
+                }
+                else
+                {
+                    cout << "Overlapping Events:\n";
+                    for (Event *event : overlappingEvents)
+                    {
+                        event->displayEvent();
+                    }
+                }
             }
             else if (choice == 5)
             {
-                int year, month, day, startHour, endHour;
+                string date;
 
-                cout << "Enter Year: ";
-                cin >> year;
+                cout << "Enter Date (YYYY-MM-DD): ";
+                cin >> date;
 
-                cout << "Enter Month: ";
-                cin >> month;
-
-                cout << "Enter Day: ";
-                cin >> day;
-
-                cout << "Enter Start Hour (24-hour format): ";
-                cin >> startHour;
-
-                cout << "Enter End Hour (24-hour format): ";
-                cin >> endHour;
-
-                scheduler.findFreeTimeSlots(year, month, day, startHour, endHour);
+                vector<pair<string, string>> freeSlots = scheduler.findFreeTimeSlots(date);
+                if (freeSlots.empty())
+                {
+                    cout << "No free time slots available.\n";
+                }
+                else
+                {
+                    cout << "Free Time Slots:\n";
+                    for (const auto &slot : freeSlots)
+                    {
+                        cout << slot.first << " - " << slot.second << "\n";
+                    }
+                }
             }
             else if (choice == 6)
             {
                 cout << "Printing Full Schedule:\n";
-                scheduler.printSchedule();
+                scheduler.printFullSchedule();
             }
             else if (choice != 7)
             {
                 cout << "Invalid choice. Please try again.\n";
             }
         }
-        catch (const std::exception &e)
+        catch (const invalid_argument &e)
+        {
+            cout << "Invalid Argument Error: " << e.what() << endl;
+        }
+        catch (const exception &e)
         {
             cout << "Error: " << e.what() << endl;
         }
-
     } while (choice != 7);
 
-    cout << "Exiting Event Scheduling System. Goodbye!\n";
+    cout << "Goodbye :) \n";
     return 0;
 }

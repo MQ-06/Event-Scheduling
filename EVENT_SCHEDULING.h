@@ -1,146 +1,223 @@
 #include <iostream>
-#include <string>
 #include <vector>
+#include <string>
+#include <stdexcept>
 #include <algorithm>
 #include "tree.cpp"
 
 class EventScheduling
 {
-private:
+public:
     Tree *root;
 
-    // Helper: Compare two events based on start date and time
-    int compareEvents(const Event *e1, const Event *e2)
+    EventScheduling() : root(nullptr) {}
+
+    ~EventScheduling() { deleteTree(root); }
+
+    void addEvent(Event *event)
     {
-        return e1->getTimeDate().compare(e2->getTimeDate());
+        root = addEventRec(root, event);
     }
 
-    // Helper: Add event to the tree recursively
-    Tree *addEvent(Tree *node, Event *event)
+    void updateEvent(int id, const string &newName, const string &newTimeDate, int newDuration)
     {
+        Tree *node = findEventByID(root, id);
         if (!node)
         {
+            throw invalid_argument("Event with the given ID does not exist.");
+        }
+
+        string newDate = newTimeDate.substr(0, 10);
+        int newStartTime = convertToMinutes(newTimeDate.substr(11, 5));
+        int newEndTime = newStartTime + newDuration;
+
+        string newStartTimeStr = convertToTime(newStartTime);
+        string newEndTimeStr = convertToTime(newEndTime);
+
+        vector<Event *> overlappingEvents = findOverlappingEvents(newDate, newStartTimeStr, newEndTimeStr);
+        if (!overlappingEvents.empty() && overlappingEvents[0]->getEventID() != id)
+        {
+            throw invalid_argument("Updated event overlaps with existing events.");
+        }
+
+        node->root_event->setEventName(newName);
+        node->root_event->setTimeDate(newTimeDate);
+        node->root_event->setEventDuration(newDuration);
+    }
+
+    void deleteEvent(int id)
+    {
+        root = deleteEventRec(root, id);
+    }
+
+    vector<Event *> findOverlappingEvents(const string &date, const string &startTime, const string &endTime)
+    {
+        int start = convertToMinutes(startTime);
+        int end = convertToMinutes(endTime);
+
+        vector<Event *> overlaps;
+        findOverlaps(root, date, start, end, overlaps);
+        return overlaps;
+    }
+
+    vector<pair<string, string>> findFreeTimeSlots(const string &date)
+    {
+        vector<Event *> events;
+        collectEventsOnDate(root, date, events);
+
+        sort(events.begin(), events.end(), [](Event *a, Event *b)
+             { return a->getStartTime() < b->getStartTime(); });
+
+        vector<pair<string, string>> freeSlots;
+        int dayStart = 0;
+        int dayEnd = 24 * 60;
+
+        for (Event *event : events)
+        {
+            if (event->getStartTime() > dayStart)
+            {
+                freeSlots.emplace_back(
+                    convertToTime(dayStart),
+                    convertToTime(event->getStartTime()));
+            }
+            dayStart = max(dayStart, event->getEndTime());
+        }
+
+        if (dayStart < dayEnd)
+        {
+            freeSlots.emplace_back(convertToTime(dayStart), convertToTime(dayEnd));
+        }
+
+        return freeSlots;
+    }
+
+    void printFullSchedule()
+    {
+        printInOrder(root);
+    }
+
+private:
+    Tree *addEventRec(Tree *node, Event *event)
+    {
+        if (!node)
             return new Tree(event);
-        }
 
-        if (hasOverlap(node, *event))
-        {
-            throw std::runtime_error("Event overlaps with an existing event.");
-        }
+        int eventStartTime = event->getStartTime();
+        int eventEndTime = event->getEndTime();
 
-        int cmp = compareEvents(event, node->root_event);
-        if (cmp < 0)
+        if (eventEndTime <= node->root_event->getStartTime())
         {
-            node->lchild = addEvent(node->lchild, event);
+            node->lchild = addEventRec(node->lchild, event);
         }
-        else if (cmp > 0)
+        else if (eventStartTime >= node->root_event->getEndTime())
         {
-            node->rchild = addEvent(node->rchild, event);
+            node->rchild = addEventRec(node->rchild, event);
         }
         else
         {
-            throw std::runtime_error("Event with the same start time already exists.");
+            throw invalid_argument("Overlapping events are not allowed.");
         }
 
         return node;
     }
 
-    // Helper: Find event by ID recursively
-    Tree *findEvent(Tree *node, int eventId)
-    {
-        if (!node)
-            return nullptr;
-        if (node->root_event->getEventID() == eventId)
-            return node;
-
-        Tree *leftSearch = findEvent(node->lchild, eventId);
-        if (leftSearch)
-            return leftSearch;
-
-        return findEvent(node->rchild, eventId);
-    }
-
-    // Helper: Delete event and rearrange the tree
-    Tree *deleteEvent(Tree *node, int eventId)
+    Tree *deleteEventRec(Tree *node, int id)
     {
         if (!node)
             return nullptr;
 
-        if (node->root_event->getEventID() == eventId)
+        if (node->root_event->getEventID() == id)
         {
             if (!node->lchild)
             {
-                Tree *temp = node->rchild;
+                Tree *right = node->rchild;
                 delete node;
-                return temp;
+                return right;
             }
             else if (!node->rchild)
             {
-                Tree *temp = node->lchild;
+                Tree *left = node->lchild;
                 delete node;
-                return temp;
+                return left;
             }
-
-            Tree *minNode = findMin(node->rchild);
-            node->root_event = minNode->root_event;
-            node->rchild = deleteEvent(node->rchild, minNode->root_event->getEventID());
+            else
+            {
+                Tree *minNode = findMin(node->rchild);
+                node->root_event = minNode->root_event;
+                node->rchild = deleteEventRec(node->rchild, minNode->root_event->getEventID());
+            }
         }
-        else if (eventId < node->root_event->getEventID())
+        else if (id < node->root_event->getEventID())
         {
-            node->lchild = deleteEvent(node->lchild, eventId);
+            node->lchild = deleteEventRec(node->lchild, id);
         }
         else
         {
-            node->rchild = deleteEvent(node->rchild, eventId);
+            node->rchild = deleteEventRec(node->rchild, id);
         }
 
         return node;
     }
 
-    // Helper: Find the minimum node in the subtree
     Tree *findMin(Tree *node)
     {
         while (node && node->lchild)
+        {
             node = node->lchild;
+        }
         return node;
     }
 
-    // Helper: Check for overlapping events
-    bool hasOverlap(Tree *node, const Event &event)
+    Tree *findEventByID(Tree *node, int id)
     {
         if (!node)
-            return false;
-
-        // Get the start and end times of the existing event
-        int startYear, startMonth, startDay, startHour, startMinute;
-        node->root_event->extract_components(startYear, startMonth, startDay, startHour, startMinute);
-
-        int endYear = startYear, endMonth = startMonth, endDay = startDay, endHour = startHour, endMinute = startMinute;
-        node->root_event->calculateEndTime(endYear, endMonth, endDay, endHour, endMinute);
-
-        // Get the start and end times of the new event
-        int newStartYear, newStartMonth, newStartDay, newStartHour, newStartMinute;
-        event.extract_components(newStartYear, newStartMonth, newStartDay, newStartHour, newStartMinute);
-
-        int newEndYear = newStartYear, newEndMonth = newStartMonth, newEndDay = newStartDay, newEndHour = newStartHour, newEndMinute = newStartMinute;
-        event.calculateEndTime(newEndYear, newEndMonth, newEndDay, newEndHour, newEndMinute);
-
-        // Check for overlap
-        bool overlap = !(newEndYear < startYear ||
-                         (newEndYear == startYear && newEndMonth < startMonth) ||
-                         (newEndYear == startYear && newEndMonth == startMonth && newEndDay < startDay) ||
-                         (newEndYear == startYear && newEndMonth == startMonth && newEndDay == startDay &&
-                          (newEndHour < startHour || (newEndHour == startHour && newEndMinute <= startMinute))) ||
-                         (endYear < newStartYear ||
-                          (endYear == newStartYear && endMonth < newStartMonth) ||
-                          (endYear == newStartYear && endMonth == newStartMonth && endDay < newStartDay) ||
-                          (endYear == newStartYear && endMonth == newStartMonth && endDay == newStartDay &&
-                           (endHour < newStartHour || (endHour == newStartHour && endMinute <= newStartMinute)))));
-
-        return overlap || hasOverlap(node->lchild, event) || hasOverlap(node->rchild, event);
+            return nullptr;
+        if (node->root_event->getEventID() == id)
+            return node;
+        if (id < node->root_event->getEventID())
+            return findEventByID(node->lchild, id);
+        return findEventByID(node->rchild, id);
     }
 
-    // Helper: Print events in-order
+    void findOverlaps(Tree *node, const string &startDate, int start, int end, vector<Event *> &overlaps)
+    {
+        if (!node)
+            return;
+
+        string eventDate = node->root_event->getTimeDate().substr(0, 10);
+        if (eventDate == startDate)
+        {
+            if (node->root_event->getEndTime() > start && node->root_event->getStartTime() < end)
+            {
+                overlaps.push_back(node->root_event);
+            }
+        }
+
+        if (node->lchild && node->lchild->root_event->getEndTime() > start)
+        {
+            findOverlaps(node->lchild, startDate, start, end, overlaps);
+        }
+
+        if (node->rchild && node->rchild->root_event->getStartTime() < end)
+        {
+            findOverlaps(node->rchild, startDate, start, end, overlaps);
+        }
+    }
+
+    void collectEventsOnDate(Tree *node, const string &date, vector<Event *> &events)
+    {
+        if (!node)
+            return;
+
+        if (node->root_event->getTimeDate().substr(0, 10) == date)
+        {
+            events.push_back(node->root_event);
+        }
+
+        collectEventsOnDate(node->lchild, date, events);
+        collectEventsOnDate(node->rchild, date, events);
+    }
+
     void printInOrder(Tree *node)
     {
         if (!node)
@@ -148,141 +225,29 @@ private:
 
         printInOrder(node->lchild);
         node->root_event->displayEvent();
-        std::cout << std::endl;
         printInOrder(node->rchild);
     }
 
-    // Helper: Find overlapping events for a specific time range
-    void getOverlappingEvents(Tree *node, int startHour, int startMinute, int endHour, int endMinute, std::vector<Event *> &overlappingEvents)
+    void deleteTree(Tree *node)
     {
         if (!node)
             return;
-
-        int eventStartYear, eventStartMonth, eventStartDay, eventStartHour, eventStartMinute;
-        node->root_event->extract_components(eventStartYear, eventStartMonth, eventStartDay, eventStartHour, eventStartMinute);
-
-        int eventEndYear = eventStartYear, eventEndMonth = eventStartMonth, eventEndDay = eventStartDay, eventEndHour = eventStartHour, eventEndMinute = eventStartMinute;
-        node->root_event->calculateEndTime(eventEndYear, eventEndMonth, eventEndDay, eventEndHour, eventEndMinute);
-
-        int eventStartTime = eventStartHour * 60 + eventStartMinute;
-        int eventEndTime = eventEndHour * 60 + eventEndMinute;
-
-        // Check if the event overlaps with the given range
-        if ((eventStartTime < endHour * 60 + endMinute) && (eventEndTime > startHour * 60 + startMinute))
-        {
-            overlappingEvents.push_back(node->root_event);
-        }
-
-        getOverlappingEvents(node->lchild, startHour, startMinute, endHour, endMinute, overlappingEvents);
-        getOverlappingEvents(node->rchild, startHour, startMinute, endHour, endMinute, overlappingEvents);
+        deleteTree(node->lchild);
+        deleteTree(node->rchild);
+        delete node;
     }
 
-public:
-    EventScheduling() : root(nullptr) {}
-
-    void addEvent(Event *event)
+    int convertToMinutes(const string &time) const
     {
-        root = addEvent(root, event);
+        int hour = stoi(time.substr(0, 2));
+        int minute = stoi(time.substr(3, 2));
+        return hour * 60 + minute;
     }
 
-    void updateEvent(int eventId, const std::string &newName, const std::string &newTime, int newDuration)
+    string convertToTime(int minutes) const
     {
-        Tree *node = findEvent(root, eventId);
-        if (!node)
-            throw std::runtime_error("Event not found.");
-
-        Event updatedEvent(newName, newTime, newDuration);
-        deleteEvent(eventId);    // Temporarily remove the event
-        addEvent(&updatedEvent); // Try to re-add the updated event
-    }
-
-    void deleteEvent(int eventId)
-    {
-        root = deleteEvent(root, eventId);
-    }
-
-    void printSchedule()
-    {
-        printInOrder(root);
-    }
-
-    std::vector<Event *> getEventsForDay(int year, int month, int day)
-    {
-        std::vector<Event *> events;
-        getEventsForDay(root, year, month, day, events);
-        return events;
-    }
-
-    void getEventsForDay(Tree *node, int year, int month, int day, std::vector<Event *> &events)
-    {
-        if (!node)
-            return;
-
-        int eventYear, eventMonth, eventDay, eventHour, eventMinute;
-        node->root_event->extract_components(eventYear, eventMonth, eventDay, eventHour, eventMinute);
-
-        // Check if the event falls on the specified day
-        if (eventYear == year && eventMonth == month && eventDay == day)
-        {
-            events.push_back(node->root_event);
-        }
-
-        getEventsForDay(node->lchild, year, month, day, events);
-        getEventsForDay(node->rchild, year, month, day, events);
-    }
-
-    void findFreeTimeSlots(int year, int month, int day, int startHour, int endHour)
-    {
-        std::vector<Event *> events = getEventsForDay(year, month, day);
-
-        // Sort events by start time
-        sort(events.begin(), events.end(), [](Event *e1, Event *e2)
-             { return e1->getTimeDate() < e2->getTimeDate(); });
-
-        std::cout << "Free time slots for " << year << "-" << month << "-" << day << ":" << std::endl;
-
-        // Check for gaps between events
-        int lastEndTime = startHour * 60; // Start of the day in minutes
-
-        for (Event *event : events)
-        {
-            int eventStartYear, eventStartMonth, eventStartDay, eventStartHour, eventStartMinute;
-            event->extract_components(eventStartYear, eventStartMonth, eventStartDay, eventStartHour, eventStartMinute);
-            int eventEndYear = eventStartYear, eventEndMonth = eventStartMonth, eventEndDay = eventStartDay, eventEndHour = eventStartHour, eventEndMinute = eventStartMinute;
-            event->calculateEndTime(eventEndYear, eventEndMonth, eventEndDay, eventEndHour, eventEndMinute);
-
-            int eventStartTime = eventStartHour * 60 + eventStartMinute;
-            int eventEndTime = eventEndHour * 60 + eventEndMinute;
-
-            // Check for free time before the event
-            if (eventStartTime > lastEndTime)
-            {
-                std::cout << "Free time: " << lastEndTime / 60 << ":00 - " << eventStartTime / 60 << ":00" << std::endl;
-            }
-
-            lastEndTime = eventEndTime;
-        }
-
-        // Check for free time after the last event
-        if (lastEndTime < endHour * 60)
-        {
-            std::cout << "Free time: " << lastEndTime / 60 << ":00 - " << endHour << ":00" << std::endl;
-        }
-    }
-
-    // Function to get overlapping events for a specific time range
-    void getOverlappingEvents(int startHour, int startMinute, int endHour, int endMinute)
-    {
-        std::vector<Event *> overlappingEvents;
-        getOverlappingEvents(root, startHour, startMinute, endHour, endMinute, overlappingEvents);
-
-        std::cout << "Overlapping events from " << startHour << ":" << startMinute
-                  << " to " << endHour << ":" << endMinute << " are:" << std::endl;
-
-        for (Event *event : overlappingEvents)
-        {
-            event->displayEvent();
-        }
+        int hour = minutes / 60;
+        int minute = minutes % 60;
+        return (hour < 10 ? "0" : "") + to_string(hour) + ":" + (minute < 10 ? "0" : "") + to_string(minute);
     }
 };
-
