@@ -46,12 +46,16 @@ public:
 
         vector<Event *> overlappingEvents = findOverlappingEvents(newDate, newStartTimeStr, newEndTimeStr);
 
-        overlappingEvents.erase(
-            remove_if(overlappingEvents.begin(), overlappingEvents.end(), [&](Event *event)
-                      { return event->getEventID() == id; }),
-            overlappingEvents.end());
+        vector<Event *> filtered;
+        for (Event *event : overlappingEvents)
+        {
+            if (event->getEventID() != id)
+            {
+                filtered.push_back(event);
+            }
+        }
 
-        if (!overlappingEvents.empty())
+        if (!filtered.empty())
         {
             throw invalid_argument("Updated event overlaps with existing events.");
         }
@@ -98,13 +102,17 @@ public:
         return actualOverlaps;
     }
 
+    static bool compare(Event *a, Event *b)
+    {
+        return a->getStartTime() < b->getStartTime();
+    }
+
     vector<pair<string, string>> findFreeTimeSlots(const string &date)
     {
         vector<Event *> events;
         collectEventsOnDate(root, date, events);
 
-        sort(events.begin(), events.end(), [](Event *a, Event *b)
-             { return a->getStartTime() < b->getStartTime(); });
+        sort(events.begin(), events.end(), compare);
 
         vector<pair<string, string>> freeSlots;
         int dayStart = 0;
